@@ -4,15 +4,10 @@ services:
     env: node
     plan: free
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node src/server.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: RENDER
         value: "true"
-      # 以下はRenderダッシュボードのEnvironment Variablesで設定してください
-      # - key: OPENAI_API_KEY
-      #   value: sk-...
-      # - key: ANTHROPIC_API_KEY
-      #   value: sk-ant-...

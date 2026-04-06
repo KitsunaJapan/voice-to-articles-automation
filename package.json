@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "MP3から記事・図表を自動生成するアプリ",
   "type": "module",
-  "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"
@@ -17,6 +16,6 @@
     "cors": "^2.8.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0 <25.0.0"
   }
 }
