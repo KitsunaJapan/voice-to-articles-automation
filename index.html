@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceArticle — 音声から記事を生成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0d0d0f;
+  --bg2: #141418;
+  --bg3: #1c1c22;
+  --bg4: #242430;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --accent: #7c6af7;
+  --accent2: #a78bfa;
+  --accent-glow: rgba(124,106,247,0.25);
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --text: #e8e8f0;
+  --text2: #9090a8;
+  --text3: #5a5a70;
+  --radius: 12px;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Noto Sans JP', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(13,13,15,0.9);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent2);
+  letter-spacing: -0.5px;
+}
+.logo-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.6; transform:scale(0.8); }
+}
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ── LAYOUT ── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  flex: 1;
+  height: calc(100vh - 57px);
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg2);
+}
+
+.panel-section {
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section:last-child { border-bottom: none; }
+
+.section-label {
+  font-size: 10px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text3);
+  margin-bottom: 14px;
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg3);
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(124,106,247,0.06);
+}
+.upload-zone input { display: none; }
+.upload-icon {
+  width: 40px; height: 40px;
+  margin: 0 auto 10px;
+  border-radius: 10px;
+  background: var(--bg4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.upload-zone p {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+.upload-zone strong { color: var(--accent2); }
+
+/* ── FILE INFO ── */
+.file-info {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-top: 10px;
+}
+.file-info.show { display: flex; }
+.file-icon { font-size: 24px; }
+.file-meta { flex: 1; overflow: hidden; }
+.file-name {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.file-size { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+/* ── PROGRESS ── */
+.progress-wrap {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.progress-wrap.show { display: flex; }
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text2);
+}
+.progress-bar {
+  height: 4px;
+  background: var(--bg4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+.progress-fill.indeterminate {
+  width: 40%;
+  animation: slide-prog 1.4s ease-in-out infinite;
+}
+@keyframes slide-prog {
+  0% { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ── TRANSCRIPT BOX ── */
+.transcript-box {
+  background: var(--bg3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.7;
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  display: none;
+}
+.transcript-box.show { display: block; }
+
+/* ── SETTINGS ── */
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.setting-row:last-child { margin-bottom: 0; }
+.setting-row label {
+  font-size: 11px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.setting-row select,
+.setting-row input[type="text"],
+.setting-row textarea {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 8px 11px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.setting-row select:focus,
+.setting-row input[type="text"]:focus,
+.setting-row textarea:focus {
+  border-color: var(--accent);
+}
+.setting-row textarea { resize: vertical; min-height: 60px; }
+
+/* APIキー入力 */
+.api-key-row {
+  display: flex;
+  gap: 6px;
+}
+.api-key-row input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 8px 11px;
+  outline: none;
+}
+.api-key-row input:focus { border-color: var(--accent); }
+
+/* ── TOGGLE ── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text2);
+}
+.toggle {
+  width: 36px; height: 20px;
+  background: var(--bg4);
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+}
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--sans);
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+.btn-primary:hover { background: #6b5ce7; box-shadow: 0 0 24px var(--accent-glow); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.btn-secondary {
+  background: var(--bg3);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--accent); }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+.btn-full { width: 100%; }
+.btn-icon { padding: 8px 10px; }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  gap: 2px;
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.tab {
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+  font-weight: 500;
+}
+.tab:hover { color: var(--text2); }
+.tab.active {
+  color: var(--accent2);
+  border-bottom-color: var(--accent);
+}
+
+/* ── EDITOR AREA ── */
+.editor-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  gap: 16px;
+  color: var(--text3);
+}
+.empty-icon { font-size: 52px; opacity: 0.4; }
+.empty-state h3 { font-size: 16px; color: var(--text2); font-weight: 500; }
+.empty-state p { font-size: 13px; line-height: 1.7; max-width: 300px; }
+
+/* ── ARTICLE CARD ── */
+.article-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.article-title {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.article-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.stat-badge {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(124,106,247,0.12);
+  color: var(--accent2);
+  border: 1px solid rgba(124,106,247,0.25);
+}
+
+/* ── MARKDOWN PREVIEW ── */
+.md-preview {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--text);
+}
+.md-preview h1,.md-preview h2,.md-preview h3 {
+  color: var(--text);
+  font-weight: 700;
+  margin: 28px 0 12px;
+  line-height: 1.35;
+}
+.md-preview h1 { font-size: 22px; }
+.md-preview h2 { font-size: 19px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.md-preview h3 { font-size: 16px; }
+.md-preview p { margin: 12px 0; }
+.md-preview ul, .md-preview ol { padding-left: 22px; margin: 12px 0; }
+.md-preview li { margin: 5px 0; }
+.md-preview code {
+  font-family: var(--mono);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: var(--accent2);
+}
+.md-preview pre {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.md-preview pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.md-preview blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 16px;
+  color: var(--text2);
+  margin: 16px 0;
+}
+.md-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.md-preview th {
+  background: var(--bg3);
+  padding: 10px 14px;
+  text-align: left;
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
+.md-preview td {
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+}
+.md-preview tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+/* Mermaid 図表ラッパー */
+.mermaid-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 20px 0;
+  overflow-x: auto;
+}
+.mermaid-wrap .mermaid { display: flex; justify-content: center; }
+
+/* ── RAW MARKDOWN EDITOR ── */
+.raw-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.8;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 0;
+}
+
+/* ── TOAST ── */
+.toast-wrap {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slide-in 0.25s ease;
+  max-width: 320px;
+}
+@keyframes slide-in {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.toast.success { background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.3); color: var(--green); }
+.toast.error   { background: rgba(248,113,113,0.15); border: 1px solid rgba(248,113,113,0.3); color: var(--red); }
+.toast.info    { background: rgba(124,106,247,0.15); border: 1px solid rgba(124,106,247,0.3); color: var(--accent2); }
+
+/* ── SUMMARY TAB ── */
+.summary-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text2);
+  margin-bottom: 24px;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ── MODAL (設定) ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 28px;
+  position: relative;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.modal-title { font-size: 17px; font-weight: 700; }
+.modal-close {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 18px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  .left-panel { height: auto; }
+  .right-panel { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    VoiceArticle
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary btn-sm" onclick="openSettings()">⚙ 設定</button>
+    <button class="btn btn-secondary btn-sm" id="copy-btn" onclick="copyMarkdown()" style="display:none">📋 コピー</button>
+    <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportMd()" style="display:none">⬇ エクスポート</button>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="app-layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- Upload -->
+    <div class="panel-section">
+      <div class="section-label">音声ファイル</div>
+      <div class="upload-zone" id="upload-zone"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDrop(event)"
+        onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*" onchange="handleFileChange(event)">
+        <div class="upload-icon">🎙</div>
+        <p><strong>クリックまたはドラッグ</strong>で<br>MP3・WAV・M4Aをアップロード<br><span style="font-size:11px;opacity:0.6">最大25MB</span></p>
+      </div>
+      <div class="file-info" id="file-info">
+        <div class="file-icon">🎵</div>
+        <div class="file-meta">
+          <div class="file-name" id="file-name">—</div>
+          <div class="file-size" id="file-size">—</div>
+        </div>
+        <button class="btn btn-secondary btn-icon btn-sm" onclick="clearFile()" title="削除">✕</button>
+      </div>
+      <div class="progress-wrap" id="transcribe-progress">
+        <div class="progress-label">
+          <span id="progress-text">文字起こし中...</span>
+          <span id="progress-pct">—</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill indeterminate" id="progress-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="panel-section" id="transcript-section" style="display:none">
+      <div class="section-label">文字起こし結果</div>
+      <div class="transcript-box show" id="transcript-box"></div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-primary btn-full" id="generate-btn" onclick="generateArticle()">
+          ✨ 記事を生成
+        </button>
+      </div>
+    </div>
+
+    <!-- Generate progress -->
+    <div class="panel-section" id="generate-section" style="display:none">
+      <div class="progress-wrap show">
+        <div class="progress-label">
+          <span>記事を生成中...</span>
+          <span>AI処理中</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill indeterminate"></div></div>
+      </div>
+    </div>
+
+    <!-- Quick settings (inline) -->
+    <div class="panel-section">
+      <div class="section-label">クイック設定</div>
+      <div class="setting-row">
+        <label>文体・トーン</label>
+        <select id="qs-tone">
+          <option value="formal">丁寧（ですます調）</option>
+          <option value="casual">カジュアル</option>
+          <option value="academic">アカデミック</option>
+          <option value="energetic">エネルギッシュ</option>
+          <option value="gentle">穏やか</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>語尾スタイル</label>
+        <select id="qs-ending">
+          <option value="desu_masu">です・ます</option>
+          <option value="da_dearu">だ・である</option>
+          <option value="casual_yo">よ・ね・よね</option>
+          <option value="question">語りかけ（疑問形）</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>記事の長さ</label>
+        <select id="qs-length">
+          <option value="medium">標準（1500〜2500字）</option>
+          <option value="short">短め（800〜1200字）</option>
+          <option value="long">詳細（3000字以上）</option>
+        </select>
+      </div>
+      <div class="toggle-row" style="margin-top:4px">
+        <span>図表・ダイアグラムを生成</span>
+        <div class="toggle on" id="diagram-toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <!-- API Keys (collapsed) -->
+    <div class="panel-section">
+      <div class="section-label" style="cursor:pointer;user-select:none" onclick="toggleApiKeys()">
+        🔑 APIキー設定 <span id="apikey-arrow" style="font-size:10px;margin-left:4px">▼</span>
+      </div>
+      <div id="apikey-section">
+        <div class="setting-row">
+          <label>OpenAI APIキー（Whisper用）</label>
+          <div class="api-key-row">
+            <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off">
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>Anthropic APIキー（Claude用）</label>
+          <div class="api-key-row">
+            <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off">
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.6">
+          ⚠️ キーはブラウザのメモリにのみ保存されます。環境変数で設定済みの場合は不要です。
+        </p>
+      </div>
+    </div>
+
+  </div><!-- /left-panel -->
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="tabs">
+      <div class="tab active" data-tab="preview" onclick="switchTab('preview')">プレビュー</div>
+      <div class="tab" data-tab="summary" onclick="switchTab('summary')">要約</div>
+      <div class="tab" data-tab="raw" onclick="switchTab('raw')">Markdown</div>
+    </div>
+    <div class="editor-area" id="editor-area">
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🎙️</div>
+        <h3>音声ファイルをアップロード</h3>
+        <p>MP3などの音声ファイルをアップロードすると、AIが自動で文字起こしして記事・図表を生成します。</p>
+      </div>
+
+      <!-- Preview tab -->
+      <div id="tab-preview" style="display:none">
+        <div class="article-meta" id="article-meta"></div>
+        <div class="md-preview" id="md-preview"></div>
+      </div>
+
+      <!-- Summary tab -->
+      <div id="tab-summary" style="display:none">
+        <h2 style="font-size:18px;margin-bottom:18px;font-weight:700">要約</h2>
+        <div class="summary-box" id="summary-box"></div>
+        <div id="tags-section"></div>
+      </div>
+
+      <!-- Raw markdown tab -->
+      <div id="tab-raw" style="display:none;height:100%">
+        <textarea class="raw-editor" id="raw-editor" spellcheck="false" placeholder="記事が生成されると、ここにMarkdownが表示されます。直接編集もできます。" oninput="onRawEdit()"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app-layout -->
+
+<!-- TOAST -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">⚙ 詳細設定</span>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="setting-row">
+      <label>対象読者</label>
+      <input type="text" id="s-audience" placeholder="例：エンジニア初心者、マーケター、一般読者">
+    </div>
+    <div class="setting-row">
+      <label>カスタム指示（追加でAIへの指示）</label>
+      <textarea id="s-custom" placeholder="例：「技術用語は必ず説明を入れてください」「箇条書きを多用してください」"></textarea>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.7;margin-bottom:16px">
+      ※ 設定は次回の生成から反映されます。<br>
+      ※ APIキーはサーバー環境変数でも設定可能です（<code style="font-size:11px;background:var(--bg3);padding:2px 5px;border-radius:4px">OPENAI_API_KEY</code>, <code style="font-size:11px;background:var(--bg3);padding:2px 5px;border-radius:4px">ANTHROPIC_API_KEY</code>）。
+    </div>
+    <button class="btn btn-primary btn-full" onclick="closeSettings()">保存して閉じる</button>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────
+// STATE
+// ──────────────────────────────────
+let state = {
+  file: null,
+  transcript: null,
+  article: null,
+  currentTab: 'preview'
+};
+
+// ──────────────────────────────────
+// FILE HANDLING
+// ──────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+}
+function handleFileChange(e) {
+  const file = e.target.files[0];
+  if (file) setFile(file);
+}
+function setFile(file) {
+  state.file = file;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = formatBytes(file.size);
+  document.getElementById('file-info').classList.add('show');
+  transcribeFile();
+}
+function clearFile() {
+  state.file = null; state.transcript = null;
+  document.getElementById('file-info').classList.remove('show');
+  document.getElementById('transcript-section').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  toast('ファイルをクリアしました', 'info');
+}
+function formatBytes(b) {
+  if (b < 1024) return b+'B';
+  if (b < 1024*1024) return (b/1024).toFixed(1)+'KB';
+  return (b/1024/1024).toFixed(1)+'MB';
+}
+
+// ──────────────────────────────────
+// TRANSCRIBE
+// ──────────────────────────────────
+async function transcribeFile() {
+  if (!state.file) return;
+
+  const openaiKey = document.getElementById('openai-key').value.trim();
+  showProgress('transcribe-progress', true);
+  document.getElementById('progress-text').textContent = '音声を文字起こし中...';
+
+  const formData = new FormData();
+  formData.append('audio', state.file);
+  if (openaiKey) formData.append('openaiKey', openaiKey);
+
+  try {
+    const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '文字起こし失敗');
+
+    state.transcript = data.text;
+    document.getElementById('transcript-box').textContent = data.text;
+    document.getElementById('transcript-section').style.display = 'block';
+    toast(`文字起こし完了（${data.duration ? Math.ceil(data.duration)+'秒' : '—'}）`, 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    showProgress('transcribe-progress', false);
+  }
+}
+
+// ──────────────────────────────────
+// GENERATE ARTICLE
+// ──────────────────────────────────
+async function generateArticle() {
+  if (!state.transcript) return toast('先に音声ファイルをアップロードしてください', 'error');
+
+  const claudeKey = document.getElementById('anthropic-key').value.trim();
+  const settings = gatherSettings();
+
+  document.getElementById('transcript-section').style.display = 'none';
+  document.getElementById('generate-section').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: state.transcript, settings, claudeKey })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '生成失敗');
+
+    state.article = data;
+    renderArticle(data);
+    document.getElementById('copy-btn').style.display = '';
+    document.getElementById('export-btn').style.display = '';
+    toast('記事の生成が完了しました ✨', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+    document.getElementById('transcript-section').style.display = 'block';
+  } finally {
+    document.getElementById('generate-section').style.display = 'none';
+  }
+}
+
+function gatherSettings() {
+  return {
+    tone:            document.getElementById('qs-tone').value,
+    ending:          document.getElementById('qs-ending').value,
+    articleLength:   document.getElementById('qs-length').value,
+    includeDiagrams: document.getElementById('diagram-toggle').classList.contains('on'),
+    targetAudience:  document.getElementById('s-audience').value.trim(),
+    customInstruction: document.getElementById('s-custom').value.trim()
+  };
+}
+
+// ──────────────────────────────────
+// RENDER
+// ──────────────────────────────────
+function renderArticle(data) {
+  // Meta
+  document.getElementById('article-meta').innerHTML = `
+    <div class="article-title">${escHtml(data.title || '（タイトルなし）')}</div>
+    <div class="article-stats">
+      ${data.readingTime ? `<span class="stat-badge">📖 約${data.readingTime}分</span>` : ''}
+      <span class="stat-badge">📝 ${(data.body||'').length}字</span>
+    </div>
+    <div class="tag-list">${(data.tags||[]).map(t=>`<span class="tag">#${escHtml(t)}</span>`).join('')}</div>
+  `;
+
+  // Preview (Markdown → HTML + Mermaid処理)
+  const bodyHtml = renderMarkdownWithMermaid(data.body || '');
+  document.getElementById('md-preview').innerHTML = bodyHtml;
+
+  // Summary
+  document.getElementById('summary-box').textContent = data.summary || '—';
+  document.getElementById('tags-section').innerHTML = `
+    <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2);font-weight:500">タグ</h3>
+    <div class="tag-list">${(data.tags||[]).map(t=>`<span class="tag">#${escHtml(t)}</span>`).join('')}</div>
+  `;
+
+  // Raw
+  document.getElementById('raw-editor').value = data.body || '';
+
+  // Show tabs
+  switchTab('preview');
+  document.getElementById('tab-preview').style.display = '';
+  document.getElementById('tab-summary').style.display = '';
+  document.getElementById('tab-raw').style.display = '';
+
+  // Mermaid描画
+  setTimeout(() => {
+    mermaid.run({ querySelector: '.mermaid' });
+  }, 100);
+}
+
+function renderMarkdownWithMermaid(md) {
+  // Mermaidブロックを一時プレースホルダに置換
+  const mermaidBlocks = [];
+  const replaced = md.replace(/```mermaid\n([\s\S]*?)```/g, (_, code) => {
+    const id = `mermaid-${mermaidBlocks.length}`;
+    mermaidBlocks.push({ id, code: code.trim() });
+    return `[[MERMAID_${mermaidBlocks.length - 1}]]`;
+  });
+
+  // 通常のMarkdown変換
+  let html = marked.parse(replaced);
+
+  // プレースホルダをMermaidラッパーに戻す
+  mermaidBlocks.forEach((b, i) => {
+    html = html.replace(
+      `<p>[[MERMAID_${i}]]</p>`,
+      `<div class="mermaid-wrap"><div class="mermaid">${escHtml(b.code)}</div></div>`
+    );
+  });
+  return html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ──────────────────────────────────
+// TABS
+// ──────────────────────────────────
+function switchTab(name) {
+  state.currentTab = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  ['preview','summary','raw'].forEach(t => {
+    const el = document.getElementById('tab-'+t);
+    if (el) el.style.display = (t === name ? '' : 'none');
+  });
+  if (!state.article) document.getElementById('empty-state').style.display = '';
+  else document.getElementById('empty-state').style.display = 'none';
+}
+
+function onRawEdit() {
+  // Rawエディタ編集時、プレビューも更新
+  const val = document.getElementById('raw-editor').value;
+  if (state.article) {
+    state.article.body = val;
+    document.getElementById('md-preview').innerHTML = renderMarkdownWithMermaid(val);
+    setTimeout(() => mermaid.run({ querySelector: '.mermaid' }), 100);
+  }
+}
+
+// ──────────────────────────────────
+// EXPORT / COPY
+// ──────────────────────────────────
+function copyMarkdown() {
+  const md = document.getElementById('raw-editor').value;
+  navigator.clipboard.writeText(md).then(() => toast('Markdownをコピーしました', 'success'));
+}
+function exportMd() {
+  if (!state.article) return;
+  const blob = new Blob([state.article.body], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(state.article.title || 'article').replace(/[^\w\u3040-\u30ff\u4e00-\u9faf]/g, '_')}.md`;
+  a.click();
+  toast('Markdownをエクスポートしました', 'success');
+}
+
+// ──────────────────────────────────
+// SETTINGS MODAL
+// ──────────────────────────────────
+function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+
+function toggleApiKeys() {
+  const sec = document.getElementById('apikey-section');
+  const arrow = document.getElementById('apikey-arrow');
+  const hidden = sec.style.display === 'none';
+  sec.style.display = hidden ? '' : 'none';
+  arrow.textContent = hidden ? '▲' : '▼';
+}
+
+// ──────────────────────────────────
+// PROGRESS HELPER
+// ──────────────────────────────────
+function showProgress(id, show) {
+  document.getElementById(id).classList.toggle('show', show);
+}
+
+// ──────────────────────────────────
+// TOAST
+// ──────────────────────────────────
+function toast(msg, type='info') {
+  const wrap = document.getElementById('toast-wrap');
+  const icons = { success:'✓', error:'✕', info:'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ'}</span><span>${escHtml(msg)}</span>`;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ──────────────────────────────────
+// MERMAID INIT
+// ──────────────────────────────────
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#7c6af7',
+    primaryTextColor: '#e8e8f0',
+    primaryBorderColor: '#3a3a4a',
+    lineColor: '#9090a8',
+    secondaryColor: '#1c1c22',
+    tertiaryColor: '#242430',
+    background: '#141418',
+    mainBkg: '#1c1c22',
+    nodeBorder: '#3a3a4a',
+    clusterBkg: '#1c1c22',
+    titleColor: '#e8e8f0',
+    edgeLabelBackground: '#141418',
+    fontFamily: 'Noto Sans JP, sans-serif'
+  }
+});
+
+// ── APIキーセクションは初期非表示 ──
+document.getElementById('apikey-section').style.display = 'none';
+</script>
+</body>
+</html>
