@@ -4,8 +4,8 @@
   "description": "MP3から記事・図表を自動生成するアプリ",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
